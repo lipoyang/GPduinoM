@@ -1,50 +1,23 @@
 #include "common.h"
 #include "UdpComm.h"
+#include "SerialComm.h"
 
 // UDP通信クラス
 UdpComm udpComm;
 // UDP受信コールバック
 void udpComm_callback(char* buff);
 
-// 送信バッファ
-static char txbuff[256];
-
-/**
- * バッテリー電圧チェック
- */
-void battery_check()
-{
-    if(!udpComm.isReady()) return;
-    
-    static int cnt1 = 0;
-    static int cnt2 = 0;
-    
-    // 100msecごとに電圧値測定
-    cnt1++;
-    if(cnt1 < 100) return;
-    cnt1 = 0;
-
-    unsigned short Vbat_ave = 573; // 573 = 3.7V
-
-    // 1秒ごとに電圧値送信
-    cnt2++;
-    if(cnt2 >= 10)
-    {
-        cnt2=0;
-        
-        txbuff[0]='#';
-        txbuff[1]='B';
-        Uint16ToHex(&txbuff[2], Vbat_ave, 3);
-        txbuff[5]='$';
-        txbuff[6]='\0';
-        udpComm.send(txbuff);
-    }
-}
+// シリアル通信クラス
+SerialComm serialComm;
+// シリアル受信コールバック
+void serialComm_callback(char* buff);
 
 // 初期設定
-void setup() {
-    Serial.begin(115200);
-    //Serial.println("setup() start!");
+void setup()
+{
+    // シリアル通信の設定
+    serialComm.begin();
+    serialComm.onReceive = serialComm_callback;
     
     // UDP通信の設定
     udpComm.beginAP(NULL, "12345678");
@@ -52,20 +25,24 @@ void setup() {
 }
 
 // メインループ
-void loop() {
-    
+void loop()
+{
     // UDP通信
     udpComm.loop();
-    // バッテリー電圧チェック
-    battery_check();
-    
-    delay(1);
+    // シリアル通信
+    serialComm.loop();
 }
-
 
 // UDP command received callback
 // buff: command string buffer
 void udpComm_callback(char* buff)
 {
-    Serial.write(buff, strlen(buff));
+    serialComm.send(buff);
+}
+
+// Serial command received callback
+// buff: command string buffer
+void serialComm_callback(char* buff)
+{
+    udpComm.send(buff);
 }
